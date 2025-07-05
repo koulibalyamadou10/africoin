@@ -1,7 +1,7 @@
 
 import 'package:africoin/models/user_model.dart';
 import 'package:africoin/models/transaction_model.dart';
-import 'package:africoin/services/currency_service.dart';
+import 'package:africoin/services/country_service.dart';
 
 class AuthService {
   static User? currentUser;
@@ -34,12 +34,14 @@ class AuthService {
   static Future<User> register(String email, String phone, String fullName, String country, String pin) async {
     await Future.delayed(Duration(milliseconds: 500));
     
+    final countryData = CountryService.getCountryByName(country);
+    
     final user = User(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       email: email,
       phone: phone,
       country: country,
-      currency: CurrencyService.countryCurrency[country] ?? 'GNF',
+      currency: countryData?.currency ?? 'FCFA',
       fullName: fullName,
       pin: pin,
     );

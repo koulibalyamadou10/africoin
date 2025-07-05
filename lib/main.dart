@@ -12,7 +12,10 @@ import 'pages/qr_scanner_page/qr_scanner_page.dart';
 import 'pages/receive_money_page/receive_money_page.dart';
 import 'pages/send_money_page/send_money_page.dart';
 import 'pages/transaction_history_page.dart';
+import 'pages/currency_converter_page/currency_converter_page.dart';
+import 'pages/topup_page/topup_page.dart';
 import 'providers/theme_provider.dart';
+import 'services/transaction_service.dart';
 
 Future<void> requestNotificationPermission() async {
   var status = await Permission.notification.status;
@@ -66,6 +69,14 @@ class MyApp extends StatelessWidget {
               GetPage(
                 name: '/transaction-history',
                 page: () => TransactionHistoryScreen(),
+              ),
+              GetPage(
+                name: '/currency-converter',
+                page: () => CurrencyConverterPage(),
+              ),
+              GetPage(
+                name: '/topup',
+                page: () => TopUpPage(),
               ),
             ],
           );

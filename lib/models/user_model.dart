@@ -1,4 +1,4 @@
-import 'package:africoin/services/currency_service.dart';
+import 'package:africoin/services/country_service.dart';
 
 class User {
   final String id;
@@ -22,7 +22,8 @@ class User {
   });
 
   double get localCurrencyBalance {
-    final rates = CurrencyService.exchangeRates;
-    return afriCoinBalance * (rates[currency] ?? 1.0);
+    final country = CountryService.getCountryByName(this.country);
+    if (country == null) return afriCoinBalance;
+    return afriCoinBalance * country.exchangeRate;
   }
 }

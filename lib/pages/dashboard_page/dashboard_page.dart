@@ -6,6 +6,10 @@ import 'package:africoin/pages/qr_scanner_page/qr_scanner_page.dart';
 import 'package:africoin/pages/receive_money_page/receive_money_page.dart';
 import 'package:africoin/pages/send_money_page/send_money_page.dart';
 import 'package:africoin/pages/transaction_history_page.dart';
+import 'package:africoin/pages/currency_converter_page/currency_converter_page.dart';
+import 'package:africoin/pages/topup_page/topup_page.dart';
+import 'package:africoin/services/country_service.dart';
+import 'package:africoin/services/transaction_service.dart';
 
 // Modèles de données
 class Transaction {
@@ -35,9 +39,17 @@ enum TransactionType { income, expense, transfer }
 // Composant pour le header avec balance - Version moderne
 class BalanceHeader extends StatelessWidget {
   final double balance;
+  final double africoinBalance;
+  final String currency;
   final VoidCallback? onProfileTap;
 
-  const BalanceHeader({Key? key, required this.balance, this.onProfileTap})
+  const BalanceHeader({
+    Key? key, 
+    required this.balance, 
+    required this.africoinBalance,
+    required this.currency,
+    this.onProfileTap
+  })
     : super(key: key);
 
   @override
@@ -81,11 +93,20 @@ class BalanceHeader extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        '${balance.toStringAsFixed(2)} FCFA',
+                        '${balance.toStringAsFixed(0)} $currency',
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 32,
                           fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${africoinBalance.toStringAsFixed(2)} AC',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ],
@@ -111,8 +132,8 @@ class BalanceHeader extends StatelessWidget {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _buildBalanceInfo('Revenus', '+125,000 FCFA', Colors.green),
-                  _buildBalanceInfo('Dépenses', '-45,000 FCFA', Colors.red),
+                  _buildBalanceInfo('Revenus', '+${(balance * 0.3).toStringAsFixed(0)} $currency', Colors.green),
+                  _buildBalanceInfo('Dépenses', '-${(balance * 0.1).toStringAsFixed(0)} $currency', Colors.red),
                 ],
               ),
             ],
@@ -213,7 +234,7 @@ class QuickActions extends StatelessWidget {
                 ),
                 QuickActionButton(
                   icon: Icons.account_balance_rounded,
-                  label: 'Prêt',
+                  label: 'Convertir',
                   gradient: const LinearGradient(
                     colors: [Color(0xFF4facfe), Color(0xFF00f2fe)],
                   ),
@@ -784,59 +805,55 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _currentIndex = 0;
 
-  final List<Transaction> _transactions = [
-    Transaction(
-      id: '1',
-      title: 'Épicerie',
-      subtitle: 'Achat au marché',
-      amount: -5000,
-      date: 'Aujourd\'hui',
-      icon: Icons.shopping_cart_rounded,
-      iconColor: const Color(0xFFff6b6b),
-      type: TransactionType.expense,
-    ),
-    Transaction(
-      id: '2',
-      title: 'Transport',
-      subtitle: 'Taxi Uber',
-      amount: -1500,
-      date: 'Aujourd\'hui',
-      icon: Icons.directions_car_rounded,
-      iconColor: const Color(0xFF4ecdc4),
-      type: TransactionType.expense,
-    ),
-    Transaction(
-      id: '3',
-      title: 'Paiement reçu',
-      subtitle: 'De André Kouassi',
-      amount: 25000,
-      date: 'Hier',
-      icon: Icons.payment_rounded,
-      iconColor: const Color(0xFF45b7d1),
-      type: TransactionType.income,
-    ),
-    Transaction(
-      id: '4',
-      title: 'Transfert',
-      subtitle: 'Vers compte épargne',
-      amount: -10000,
-      date: 'Hier',
-      icon: Icons.account_balance_rounded,
-      iconColor: const Color(0xFF96ceb4),
-      type: TransactionType.transfer,
-    ),
-  ];
+  List<Transaction> get _transactions {
+    final user = AuthService.currentUser;
+    if (user == null) return [];
+    
+    return TransactionService.getRecentTransactions(user.id).map((t) {
+      final isReceived = t.toUserId == user.id;
+      return Transaction(
+        id: t.id,
+        title: isReceived ? 'Paiement reçu' : 'Paiement envoyé',
+        subtitle: t.description ?? (isReceived ? 'Crédit' : 'Débit'),
+        amount: isReceived ? t.amount : -t.amount,
+        date: _formatDate(t.date),
+        icon: isReceived ? Icons.arrow_downward : Icons.arrow_upward,
+        iconColor: isReceived ? Colors.green : Colors.red,
+        type: isReceived ? TransactionType.income : TransactionType.expense,
+      );
+    }).toList();
+  }
+
+  String _formatDate(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date).inDays;
+    
+    if (difference == 0) return 'Aujourd\'hui';
+    if (difference == 1) return 'Hier';
+    return '${date.day}/${date.month}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final user = AuthService.currentUser;
+    if (user == null) {
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+    
+    final country = CountryService.getCountryByName(user.country);
+    
     return Scaffold(
       backgroundColor: const Color(0xFFf8f9fa),
       body: Column(
         children: [
           BalanceHeader(
-            balance: 125000,
+            balance: user.localCurrencyBalance,
+            africoinBalance: user.afriCoinBalance,
+            currency: country?.currency ?? 'FCFA',
             onProfileTap: () {
-              print('Profile tapped');
+              Get.to(() => ProfileScreen(), transition: Transition.rightToLeft);
             },
           ),
           Expanded(
@@ -846,8 +863,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   QuickActions(
                     onSend: () => print('Send tapped'),
                     onRequest: () => print('Request tapped'),
-                    onLoan: () => print('Loan tapped'),
-                    onTopup: () => print('Topup tapped'),
+                    onLoan: () => Get.to(() => CurrencyConverterPage(), transition: Transition.rightToLeft),
+                    onTopup: () => Get.to(() => TopUpPage(), transition: Transition.rightToLeft),
                   ),
                   const SizedBox(height: 16),
                   RecentTransactions(
